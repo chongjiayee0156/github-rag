@@ -1,3 +1,4 @@
+```
 saas-github-rag/
 ├── backend/
 │   ├── app/
@@ -15,6 +16,7 @@ saas-github-rag/
 │   ├── script.js         # JavaScript for API calls
 │   └── style.css         # Basic styling
 └── README.md             # Instructions
+```
 
 1. Set up the backend:
    - Install dependencies: `pip install -r requirements.txt`
