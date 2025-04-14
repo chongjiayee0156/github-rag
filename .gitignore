@@ -1,0 +1,15 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+
+# Environments
+backend/.env
+backend/venv/
+
+
+# MacOS specific
+.DS_Store
+
+# --- Project Specific ---
+
+# ChromaDB persistent storage (contains generated data)
+backend/chroma_db_store/

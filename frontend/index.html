@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub RAG Agent</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>GitHub Repository RAG Agent</h1>
+
+    <div class="container">
+        <h2>1. Setup Repository</h2>
+        <form id="setup-form">
+            <label for="repo-url">GitHub Repository URL:</label>
+            <input type="url" id="repo-url" name="repo-url" required placeholder="https://github.com/owner/repo">
+
+            <label for="github-pat">GitHub PAT (Optional for Private Repos):</label>
+            <input type="password" id="github-pat" name="github-pat" placeholder="Enter PAT if needed">
+
+            <button type="submit">Setup Repository</button>
+        </form>
+        <div id="setup-status"></div>
+        <!-- Hidden input to store the current task ID -->
+        <input type="hidden" id="current-task-id">
+    </div>
+
+    <div class="container" id="qa-section" style="display: none;">
+        <h2>2. Ask Questions</h2>
+        <p>Repository: <strong id="repo-context"></strong></p>
+        <form id="qa-form">
+            <label for="question">Your Question:</label>
+            <textarea id="question" name="question" rows="3" required placeholder="e.g., What does the main function in script.py do?"></textarea>
+            <button type="submit">Ask</button>
+        </form>
+        <div id="qa-response">
+             <h3>Answer:</h3>
+             <pre id="answer-output">Ask a question above...</pre>
+        </div>
+         <div id="qa-loading" class="loading" style="display: none;">Thinking...</div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
