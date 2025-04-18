@@ -25,6 +25,7 @@ label {
 
 input[type="url"],
 input[type="password"],
+input[type="text"],
 textarea {
     width: 95%; /* Allow space for padding */
     padding: 10px;

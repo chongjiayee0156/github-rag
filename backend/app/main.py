@@ -1,10 +1,14 @@
 import logging
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse # Optional: For SSE status updates
 import asyncio # Optional: For SSE
 import os
-
+import requests 
+from fastapi.security import OAuth2PasswordBearer 
+from typing import List, Optional 
+from fastapi.responses import StreamingResponse
+import time
 from . import schemas, state_manager, tasks
 
 # Configure logging
@@ -198,6 +202,68 @@ async def ask_question(request: schemas.QuestionRequest):
 
     return schemas.AnswerResponse(answer=result["answer"])
 
+@app.post("/api/search-repos", response_model=schemas.SearchResponse)
+async def search_repositories(request: schemas.SearchRequest):
+    """
+    Endpoint to search repositories on GitHub using the Search API.
+    """
+    logger.info(f"Received search request with query: {request.query}")
+    github_api_url = f"https://api.github.com/search/repositories"
+    
+    # Use PAT for authentication if provided (better rate limits)
+    headers = {"Accept": "application/vnd.github.v3+json"}
+    if request.github_pat:
+        headers["Authorization"] = f"token {request.github_pat}"
+        logger.info("Using provided GitHub PAT for search API.")
+    else:
+        logger.warning("No GitHub PAT provided for search, using unauthenticated request (lower rate limits).")
+        
+            
+    # Construct query parameters - keep it simple for now
+    # You can add more params like sort, order, per_page later
+    params = {'q': request.query, 'per_page': 20} # Limit to 20 results for now
+    
+    logger.info(f"Calling GitHub Search API with params: {params}")
+
+    try:
+        response = requests.get(github_api_url, headers=headers, params=params)
+        response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
+
+        search_data = response.json()
+        
+        # Extract relevant info for the frontend
+        results = []
+        for item in search_data.get("items", []):
+            if item.get("html_url") and item.get("name") and item.get("full_name") and item.get("owner"):
+                 results.append(
+                     schemas.RepositoryInfo(
+                         name=item["name"],
+                         full_name=item["full_name"],
+                         html_url=item["html_url"],
+                         description=item.get("description"),
+                         owner_login=item["owner"]["login"]
+                     )
+                 )
+            
+        logger.info(f"Search returned {len(results)} repositories.")
+        return schemas.SearchResponse(items=results)
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error calling GitHub Search API: {e}", exc_info=True)
+        # Check for specific status codes if needed
+        status_code = e.response.status_code if e.response is not None else 500
+        detail = f"Error contacting GitHub Search API: {e}"
+        if status_code == 401:
+             detail = "GitHub API authentication failed. Check your PAT."
+        elif status_code == 403:
+             detail = "GitHub API rate limit exceeded or access forbidden. Try adding/checking your PAT."
+        elif status_code == 422:
+             detail = "GitHub API validation failed. Check your search query syntax."
+        raise HTTPException(status_code=status_code, detail=detail)
+    except Exception as e:
+        logger.error(f"Unexpected error during repository search: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An unexpected error occurred during search.")
+    
 # Need uuid for task_id generation
 import uuid
 

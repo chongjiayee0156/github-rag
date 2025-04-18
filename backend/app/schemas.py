@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 class RepoSetupRequest(BaseModel):
     github_repo_url: str
@@ -28,3 +28,17 @@ class GraphStateUpdate(BaseModel):
     step: str
     details: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+    
+class SearchRequest(BaseModel):
+    query: str
+    github_pat: Optional[str] = None # Pass PAT for potentially better rate limits/private search
+    
+class RepositoryInfo(BaseModel):
+    name: str
+    full_name: str
+    html_url: str
+    description: Optional[str] = None
+    owner_login: str # Added owner login for clarity
+
+class SearchResponse(BaseModel):
+    items: List[RepositoryInfo]

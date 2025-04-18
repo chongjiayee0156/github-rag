@@ -1,7 +1,10 @@
-const setupForm = document.getElementById('setup-form');
-const setupStatusDiv = document.getElementById('setup-status');
+// --- Get new/changed elements ---
+const searchForm = document.getElementById('search-form'); // Changed from setupForm
+const searchStatusDiv = document.getElementById('search-status');
+const searchResultsDiv = document.getElementById('search-results');
+const resultsListUl = document.getElementById('results-list');
+const setupStatusDiv = document.getElementById('setup-status'); // Keep this for setup phase
 const currentTaskIdInput = document.getElementById('current-task-id');
-
 const qaSection = document.getElementById('qa-section');
 const qaForm = document.getElementById('qa-form');
 const qaResponseDiv = document.getElementById('qa-response');
@@ -16,6 +19,19 @@ const API_BASE_URL = 'http://localhost:8000';
 
 let currentTaskPollingInterval = null; // To store the interval ID for status polling
 let currentEventSource = null; // To store EventSource connection
+
+// --- Helper Functions ---
+function displaySearchStatus(message, isError = false) {
+    searchStatusDiv.textContent = message;
+    searchStatusDiv.className = `status-message ${isError ? 'failed' : 'processing'}`;
+    searchStatusDiv.style.display = 'block';
+}
+
+function clearSearchResults() {
+    resultsListUl.innerHTML = '';
+    searchResultsDiv.style.display = 'none'; // Hide results section
+    searchStatusDiv.style.display = 'none'; // Hide search status
+}
 
 
 function displaySetupStatus(message, statusClass = '') {
@@ -42,75 +58,175 @@ function hideQaSection() {
     displayAnswer('Ask a question above...'); // Reset answer area
 }
 
-// --- Event Listener for Setup Form ---
-setupForm.addEventListener('submit', async (event) => {
+searchForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    console.log("Submit prevented. Does page still reload?");
-    hideQaSection(); // Hide Q&A while setting up new repo
-    stopStatusUpdates(); // Stop previous polling/SSE
+    console.log("Search form submitted.");
 
-    const repoUrl = document.getElementById('repo-url').value;
+    // Clear previous results and statuses
+    clearSearchResults();
+    displaySetupStatus(''); // Clear setup status
+    hideQaSection();
+    stopStatusUpdates(); // Stop any previous SSE/polling
+
+    const searchQuery = document.getElementById('search-query').value;
     const githubPat = document.getElementById('github-pat').value;
 
-    console.log(`Starting setup for repo: ${repoUrl} with PAT: ${githubPat ? 'Provided' : 'Not Provided'}`);
-
-    displaySetupStatus('Starting repository setup...', 'processing');
-
-    console.log(JSON.stringify({
-        github_repo_url: repoUrl,
-        github_pat: githubPat || null, // Send null if empty
-    }),)
+    displaySearchStatus('Searching repositories on GitHub...', false);
+    searchResultsDiv.style.display = 'block'; // Show results section (initially empty list)
 
     try {
-        const response = await fetch(`${API_BASE_URL}/api/setup-repo`, {
+        const response = await fetch(`${API_BASE_URL}/api/search-repos`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                github_repo_url: repoUrl,
-                github_pat: githubPat || null, // Send null if empty
+                query: searchQuery,
+                github_pat: githubPat || null
             }),
         });
 
-        console.log("Setup response:", response);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: "Unknown server error during search" }));
+            throw new Error(`Search failed: ${response.status} - ${errorData.detail}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.items || data.items.length === 0) {
+            displaySearchStatus('No repositories found matching your query.', false);
+             resultsListUl.innerHTML = '<li>No results found.</li>';
+            return;
+        }
+
+        displaySearchStatus(`Found ${data.items.length} repositories. Select one to analyze.`, false);
+
+        // Populate results list
+        resultsListUl.innerHTML = ''; // Clear previous results
+        data.items.forEach(repo => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <strong>${repo.full_name}</strong> (${repo.owner_login})<br>
+                <small>${repo.description || 'No description'}</small><br>
+                <button class="analyze-button" data-repo-url="${repo.html_url}">Analyze This Repo</button>
+            `;
+            // Add event listener to the button INSIDE this loop
+            li.querySelector('.analyze-button').addEventListener('click', handleAnalyzeButtonClick);
+            resultsListUl.appendChild(li);
+        });
+
+    } catch (error) {
+        console.error('Error searching repositories:', error);
+        displaySearchStatus(`Error searching: ${error.message}`, true);
+    }
+});
+
+// --- NEW Handler for "Analyze This Repo" button clicks ---
+async function handleAnalyzeButtonClick(event) {
+    const repoUrl = event.target.getAttribute('data-repo-url');
+    const githubPat = document.getElementById('github-pat').value; // Get PAT again
+
+    if (!repoUrl) return;
+
+    console.log(`Analyze button clicked for repo: ${repoUrl}`);
+    
+    // --- Now trigger the ORIGINAL setup process ---
+    displaySetupStatus(''); // Clear previous setup message
+    hideQaSection();
+    stopStatusUpdates();
+
+    // Visually indicate which repo is being processed (optional)
+     resultsListUl.querySelectorAll('.analyze-button').forEach(btn => btn.disabled = true); // Disable all buttons
+     event.target.textContent = 'Analyzing...'; // Change text of clicked button
+     // change color of button to indicate processing
+        event.target.style.backgroundColor = '#ccc'; // Change color to indicate processing
+
+
+    displaySetupStatus(`Starting analysis for ${repoUrl}...`, 'processing');
+
+    try {
+         // --- Call the ORIGINAL /api/setup-repo endpoint ---
+        const response = await fetch(`${API_BASE_URL}/api/setup-repo`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                github_repo_url: repoUrl,
+                github_pat: githubPat || null,
+            }),
+        });
+
+        // Re-enable buttons after call (even if failed)
+         resultsListUl.querySelectorAll('.analyze-button').forEach(btn => {
+            btn.disabled = false;
+            if(btn === event.target) btn.textContent = 'Analyze This Repo'; // Reset text
+         });
+
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ detail: "Unknown server error" }));
-            throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.detail}`);
+            const errorData = await response.json().catch(() => ({ detail: "Unknown server error starting setup" }));
+            throw new Error(`Setup failed: ${response.status} - ${errorData.detail}`);
         }
 
         const data = await response.json();
         const taskId = data.task_id;
         currentTaskIdInput.value = taskId; // Store task ID
 
-        console.log(`Setup initiated with Task ID: ${taskId}`);
+        console.log(`Setup initiated with Task ID: ${taskId} for repo ${repoUrl}`);
+        displaySetupStatus(`Setup initiated (Task ID: ${taskId}) for ${repoUrl}. Waiting for completion...`, 'processing');
 
-        displaySetupStatus(`Setup initiated (Task ID: ${taskId}). Waiting for completion...`, 'processing');
-
-
-        // Start polling for status OR use Server-Sent Events
-        startStatusUpdates(taskId); // Use SSE preferable
+        // Start polling/SSE for status updates (using the existing functions)
+        startStatusUpdates(taskId, repoUrl); // Pass repoUrl for context
 
     } catch (error) {
         console.error('Error starting setup:', error);
-        displaySetupStatus(`Error starting setup: ${error.message}`, 'failed');
+        displaySetupStatus(`Error starting setup for ${repoUrl}: ${error.message}`, 'failed');
         hideQaSection();
+         // Re-enable buttons if error occurred before fetch completed fully
+         resultsListUl.querySelectorAll('.analyze-button').forEach(btn => {
+            btn.disabled = false;
+             if(btn === event.target) btn.textContent = 'Analyze This Repo';
+         });
     }
-});
+}
 
 
-// --- Function to Start Status Updates (Polling or SSE) ---
-function startStatusUpdates(taskId) {
-    console.log(`Starting status updates for task ${taskId}`);
-    // Prioritize Server-Sent Events if available
+// --- Status Update Functions (startStatusUpdates, stopStatusUpdates, startSSE, startPolling, handleStatusUpdate) ---
+// MODIFY handleStatusUpdate slightly to use the repoUrl passed in startStatusUpdates
+let currentRepoUrlForStatus = null; // Store repoUrl context for status messages
+
+function startStatusUpdates(taskId, repoUrl = null) { // Accept repoUrl
+    console.log(`Starting status updates for task ${taskId} (Repo: ${repoUrl})`);
+    currentRepoUrlForStatus = repoUrl; // Store it
     if (typeof(EventSource) !== "undefined") {
-        console.log(`Starting SSE connection for task ${taskId}`);
         startSSEStatusUpdates(taskId);
     } else {
-        // Fallback to polling
-        console.log(`Starting polling for task ${taskId}`);
         startPollingStatusUpdates(taskId);
+    }
+}
+
+// Modify handleStatusUpdate to use currentRepoUrlForStatus
+function handleStatusUpdate(statusData) {
+    console.log("Handling status update:", statusData);
+    // If statusData itself includes repo_url, use that, otherwise use the stored one
+    const repoUrl = statusData.repo_url || currentRepoUrlForStatus || statusData.task_id;
+    const { task_id, status, error } = statusData;
+
+    // Logic remains mostly the same, just uses the resolved repoUrl for display
+    if (status === 'COMPLETED') {
+        displaySetupStatus(`Setup complete for ${repoUrl}.`, 'completed');
+        stopStatusUpdates();
+        showQaSection(task_id, repoUrl); // Show QA section
+    } else if (status === 'FAILED') {
+        displaySetupStatus(`Setup failed for ${repoUrl}: ${error || 'Unknown reason'}`, 'failed');
+        stopStatusUpdates();
+        hideQaSection();
+    } else if (status === 'PROCESSING' || status === 'PENDING') {
+        displaySetupStatus(`Status for ${repoUrl}: ${status}...`, 'processing');
+    } else if (status === 'NOT_FOUND') {
+         displaySetupStatus(`Task ${task_id} not found by server. Setup might have failed early or ID is incorrect.`, 'failed');
+         stopStatusUpdates();
+         hideQaSection();
+    }
+     else {
+        displaySetupStatus(`Current status for ${repoUrl}: ${status}...`, 'processing');
     }
 }
 
@@ -181,34 +297,6 @@ function startPollingStatusUpdates(taskId) {
         }
     }, 3000); // Poll every 3 seconds
 }
-
-// --- Common Handler for Status Data (from Polling or SSE) ---
-function handleStatusUpdate(statusData) {
-     console.log("Handling status update:", statusData);
-     const { task_id, status, error, repo_url } = statusData;
-
-    if (status === 'COMPLETED') {
-        displaySetupStatus(`Setup complete for ${repo_url || task_id}.`, 'completed');
-        stopStatusUpdates(); // Stop polling/SSE on completion
-        showQaSection(task_id, repo_url);
-    } else if (status === 'FAILED') {
-        displaySetupStatus(`Setup failed for ${repo_url || task_id}: ${error || 'Unknown reason'}`, 'failed');
-        stopStatusUpdates(); // Stop polling/SSE on failure
-        hideQaSection();
-    } else if (status === 'PROCESSING' || status === 'PENDING') {
-        // Update status message but keep polling/SSE active
-        displaySetupStatus(`Status for ${repo_url || task_id}: ${status}...`, 'processing');
-    } else if (status === 'NOT_FOUND') {
-         displaySetupStatus(`Task ${task_id} not found by server. Setup might have failed early or ID is incorrect.`, 'failed');
-         stopStatusUpdates();
-         hideQaSection();
-    }
-     else {
-        // Keep showing processing for unknown or intermediate states
-        displaySetupStatus(`Current status for ${repo_url || task_id}: ${status}...`, 'processing');
-    }
-}
-
 
 // --- Event Listener for QA Form ---
 qaForm.addEventListener('submit', async (event) => {

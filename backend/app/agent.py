@@ -18,6 +18,7 @@ from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStoreRetriever
 
 from langgraph.graph import StateGraph, END
+import math
 
 # Import state manager functions
 from .state_manager import store_retriever, update_task_status, get_task_status, cleanup_task_state
@@ -186,6 +187,32 @@ def split_documents(state: GraphState) -> GraphState:
         return {**state, "documents": None, "error": f"Failed to split documents: {e}"}
 
 
+# Rough token estimator (you can refine this)
+def estimate_tokens(text):
+    return math.ceil(len(text) / 4)  # Basic heuristic: 1 token ≈ 4 characters
+
+def batch_documents(documents, max_tokens=18000):  # Leave room below 20k limit
+    batches = []
+    current_batch = []
+    current_tokens = 0
+
+    for doc in documents:
+        doc_tokens = estimate_tokens(doc.page_content)
+        if current_tokens + doc_tokens > max_tokens:
+            if current_batch:
+                batches.append(current_batch)
+            current_batch = [doc]
+            current_tokens = doc_tokens
+        else:
+            current_batch.append(doc)
+            current_tokens += doc_tokens
+
+    if current_batch:
+        batches.append(current_batch)
+
+    return batches
+
+
 @set_step("Creating Vector Store")
 def create_vector_store_and_retriever(state: GraphState) -> GraphState:
     documents = state.get("documents")
@@ -193,10 +220,9 @@ def create_vector_store_and_retriever(state: GraphState) -> GraphState:
     persist_dir = state.get("chroma_persist_dir")
 
     if not documents:
-         logger.warning(f"Task {task_id}: No documents available to create vector store.")
-         # If no docs were loaded, we can't create a retriever. Mark as error? Or allow empty retriever?
-         # Let's treat it as an error for RAG purposes.
-         return {**state, "retriever": None, "error": "No documents found to build the knowledge base."}
+        logger.warning(f"Task {task_id}: No documents available to create vector store.")
+        return {**state, "retriever": None, "error": "No documents found to build the knowledge base."}
+
     if not persist_dir:
         return {**state, "retriever": None, "error": "ChromaDB persistence directory not set."}
 
@@ -204,38 +230,39 @@ def create_vector_store_and_retriever(state: GraphState) -> GraphState:
         logger.info(f"Task {task_id}: Initializing Vertex AI Embeddings ({EMBEDDING_MODEL_NAME})...")
         embeddings = VertexAIEmbeddings(
             model_name=EMBEDDING_MODEL_NAME,
-            project=VERTEXAI_PROJECT_ID, # Keep these if they work, remove if relying on env vars
+            project=VERTEXAI_PROJECT_ID,
             location=VERTEXAI_LOCATION
         )
 
         collection_name = f"{CHROMA_COLLECTION_NAME_PREFIX}{task_id}"
-        logger.info(f"Task {task_id}: Creating ChromaDB vector store (collection: {collection_name}) from {len(documents)} chunks in {persist_dir}...")
+        logger.info(f"Task {task_id}: Splitting {len(documents)} documents into batches to avoid token limit...")
 
-        # Use persistence
-        vector_store = Chroma.from_documents(
-            documents=documents,
-            embedding=embeddings,
+        document_batches = batch_documents(documents)
+
+        for i, batch in enumerate(document_batches):
+            logger.info(f"Task {task_id}: Processing batch {i+1}/{len(document_batches)} with {len(batch)} documents...")
+            Chroma.from_documents(
+                documents=batch,
+                embedding=embeddings,
+                collection_name=collection_name,
+                persist_directory=persist_dir
+            )
+
+        retriever = Chroma(
             collection_name=collection_name,
-            persist_directory=persist_dir
-        )
+            persist_directory=persist_dir,
+            embedding_function=embeddings
+        ).as_retriever(search_kwargs={'k': 5})
 
-        # It's good practice to explicitly persist changes if needed, though from_documents often handles it.
-        # vector_store.persist() # Might not be strictly necessary after from_documents
-
-        retriever = vector_store.as_retriever(search_kwargs={'k': 5})
         logger.info(f"Task {task_id}: ChromaDB vector store and retriever created successfully.")
-
-        # *** Store the retriever in the central state manager ***
         store_retriever(task_id, retriever)
-        # *******************************************************
 
-        return {**state, "retriever": retriever, "error": None} # Keep retriever in state for potential chaining within graph if needed
+        return {**state, "retriever": retriever, "error": None}
 
     except Exception as e:
         logger.error(f"Task {task_id}: Error creating/persisting ChromaDB vector store: {e}", exc_info=True)
-        # Clean up potentially corrupted chroma dir?
-        # shutil.rmtree(persist_dir, ignore_errors=True) # Be cautious with auto-cleanup
         return {**state, "retriever": None, "error": f"Failed to create vector store: {e}"}
+    
 
 @set_step("Cleaning Up Cloned Repo")
 def cleanup_local_repo(state: GraphState) -> GraphState:
@@ -344,23 +371,32 @@ def query_repository(retriever: VectorStoreRetriever, question: str) -> Dict[str
             temperature=0.1, # Lower temperature for more factual RAG
         )
 
-        rag_template = """ Your are a helpful assistant for studying a specific repository.
-        Based solely on the following context from the codebase, answer the question.
+#         rag_template = """ Your are a helpful assistant for studying a specific repository.
+#         Based solely on the following context from the codebase, answer the question.
         
-        1. If the question is about a specific code snippet, provide a detailed explanation of that code.
-        2. If the question is about a tutorial of the codebase, provide an easy-to-understand tutorial chapter.
-            - start off by explaining to 5 year old what the code does.
-            - then, slowly explain the code in a step-by-step manner.
-            - use code snippets to illustrate the explanation.
-            - use analogies to help the reader understand.
-            - use examples to clarify the concepts.
-            - use diagrams to illustrate complex concepts.
-        3. If the question is about writing a README, provide a beginner-friendly README section
-            - Include a title.
-            - Include a beginner friendly description
-            - Include usage instructions.
-            - Include tech stack.
-            - Output in Markdown format.
+#         1. If the question is about a specific code snippet, provide a detailed explanation of that code.
+#         2. If the question is about a tutorial of the codebase, provide an easy-to-understand tutorial chapter.
+#             - start off by explaining to 5 year old what the code does.
+#             - then, slowly explain the code in a step-by-step manner.
+#             - use code snippets to illustrate the explanation.
+#             - use analogies to help the reader understand.
+#             - use examples to clarify the concepts.
+#             - use diagrams to illustrate complex concepts.
+#         3. If the question is about writing a README, provide a beginner-friendly README section
+#             - Include a title.
+#             - Include a beginner friendly description
+#             - Include usage instructions.
+#             - Include tech stack.
+#             - Output in Markdown format.
+        
+
+
+# Context:
+# {context}
+
+# Question: {question}
+# Answer:"""
+        rag_template = """Based solely on the following context from the codebase, answer the question.
         
 
 

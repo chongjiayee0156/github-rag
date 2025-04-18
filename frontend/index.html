@@ -10,19 +10,30 @@
     <h1>GitHub Repository RAG Agent</h1>
 
     <div class="container">
-        <h2>1. Setup Repository</h2>
-        <form id="setup-form">
-            <label for="repo-url">GitHub Repository URL:</label>
-            <input type="url" id="repo-url" name="repo-url" required placeholder="https://github.com/owner/repo">
+        <h2>1. Search and Select Repository</h2>
+        <form id="search-form"> <!-- Changed form ID -->
+            <label for="search-query">Search Query:</label> <!-- Changed label -->
+            <!-- Changed input type and ID -->
+            <input type="text" id="search-query" name="search-query" required placeholder="e.g., langchain python agent OR language:python topic:rag">
 
-            <label for="github-pat">GitHub PAT (Optional for Private Repos):</label>
+            <label for="github-pat">GitHub PAT (Recommended for higher rate limits):</label>
             <input type="password" id="github-pat" name="github-pat" placeholder="Enter PAT if needed">
 
-            <button type="submit">Setup Repository</button>
+            <!-- Changed button text and type (optional, JS handles submit) -->
+            <button type="submit">Search Repositories</button>
         </form>
-        <div id="setup-status"></div>
-        <!-- Hidden input to store the current task ID -->
-        <input type="hidden" id="current-task-id">
+        <!-- Area to display search status/errors -->
+        <div id="search-status" class="status-message"></div>
+        <!-- Area to display search results -->
+        <div id="search-results" class="results-container">
+             <h3>Search Results:</h3>
+             <ul id="results-list">
+                 <!-- Results will be populated here by JS -->
+             </ul>
+        </div>
+         <!-- Area for setup status AFTER selection -->
+         <div id="setup-status" class="status-message"></div>
+         <input type="hidden" id="current-task-id">
     </div>
 
     <div class="container" id="qa-section" style="display: none;">
