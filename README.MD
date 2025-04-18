@@ -1,26 +1,13 @@
 [watch demo](https://youtu.be/aV4cq7W9uY0)
 
-```
-Directory structure:
-└── chongjiayee0156-github-rag/
-    ├── README.MD
-    ├── backend/
-    │   ├── requirements.txt
-    │   ├── .env.example
-    │   └── app/
-    │       ├── __init__.py
-    │       ├── agent.py
-    │       ├── main.py
-    │       ├── schemas.py
-    │       ├── state_manager.py
-    │       └── tasks.py
-    └── frontend/
-        ├── index.html
-        ├── script.js
-        └── style.css
 
-```
+# Searching Github Repositories & Asking Questions
 
+## Overview
+This project allows you to search through Github repositories and ask questions about them. 
+Include any keywords or qualifiers you want to search for, and the app will return relevant results.
+
+# Setup Instructions
 1. Set up the backend:
    - Install dependencies: `pip install -r requirements.txt`
    - Copy `.env.example` to `.env` and fill in your credentials. (Github PAT, Google Cloud Vertex AI Project ID, etc.)
@@ -34,3 +21,7 @@ Directory structure:
     - Use the form to input your query github repo. (only supports public repos)
     - Click "Submit" to send the request to the backend.
     - When the repo is done being processed, feel free to ask questions about the repo.
+
+# Architecture Diagram
+
+![architecture_diagram](./4052_a2.drawio.png)
