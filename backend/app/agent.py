@@ -371,33 +371,23 @@ def query_repository(retriever: VectorStoreRetriever, question: str) -> Dict[str
             temperature=0.1, # Lower temperature for more factual RAG
         )
 
-#         rag_template = """ Your are a helpful assistant for studying a specific repository.
-#         Based solely on the following context from the codebase, answer the question.
+        rag_template = """ Your are a helpful assistant for studying a specific repository.
+        Based solely on the following context from the codebase, answer the question.
         
-#         1. If the question is about a specific code snippet, provide a detailed explanation of that code.
-#         2. If the question is about a tutorial of the codebase, provide an easy-to-understand tutorial chapter.
-#             - start off by explaining to 5 year old what the code does.
-#             - then, slowly explain the code in a step-by-step manner.
-#             - use code snippets to illustrate the explanation.
-#             - use analogies to help the reader understand.
-#             - use examples to clarify the concepts.
-#             - use diagrams to illustrate complex concepts.
-#         3. If the question is about writing a README, provide a beginner-friendly README section
-#             - Include a title.
-#             - Include a beginner friendly description
-#             - Include usage instructions.
-#             - Include tech stack.
-#             - Output in Markdown format.
-        
-
-
-# Context:
-# {context}
-
-# Question: {question}
-# Answer:"""
-        rag_template = """Based solely on the following context from the codebase, answer the question.
-        
+        1. If the question is about a specific code snippet, provide a detailed explanation of that code.
+        2. If the question is about a tutorial of the codebase, provide an easy-to-understand tutorial chapter.
+            - start off by explaining to 5 year old what the code does.
+            - then, slowly explain the code in a step-by-step manner.
+            - use code snippets to illustrate the explanation.
+            - use analogies to help the reader understand.
+            - use examples to clarify the concepts.
+            - use diagrams to illustrate complex concepts.
+        3. If the question is about writing a README, provide a beginner-friendly README section
+            - Include a title.
+            - Include a beginner friendly description
+            - Include usage instructions.
+            - Include tech stack.
+            - Output in Markdown format.
 
 
 Context:

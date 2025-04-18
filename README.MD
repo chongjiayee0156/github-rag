@@ -1,23 +1,24 @@
-[watch demo](https://youtu.be/msxmKouLeH8?si=vxDf2QsovKobnop8)
+[watch demo](https://youtu.be/aV4cq7W9uY0)
 
 ```
-saas-github-rag/
-├── backend/
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py         # FastAPI app, API endpoints
-│   │   ├── schemas.py      # Pydantic models for validation
-│   │   ├── agent.py        # LangGraph agent logic 
-│   │   ├── state_manager.py # Simple in-memory state (retrievers, task status)
-│   │   └── tasks.py        # Background task functions
-│   ├── .env              # Credentials 
-│   ├── requirements.txt  # Python dependencies
-│   
-├── frontend/
-│   ├── index.html        # Main HTML page
-│   ├── script.js         # JavaScript for API calls
-│   └── style.css         # Basic styling
-└── README.md             # Instructions
+Directory structure:
+└── chongjiayee0156-github-rag/
+    ├── README.MD
+    ├── backend/
+    │   ├── requirements.txt
+    │   ├── .env.example
+    │   └── app/
+    │       ├── __init__.py
+    │       ├── agent.py
+    │       ├── main.py
+    │       ├── schemas.py
+    │       ├── state_manager.py
+    │       └── tasks.py
+    └── frontend/
+        ├── index.html
+        ├── script.js
+        └── style.css
+
 ```
 
 1. Set up the backend:
