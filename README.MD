@@ -1,11 +1,15 @@
+# Searching Github Repositories & Asking LLM Questions (RAG)
 
+<br>
+
+# Demo
 <p align="center">
    <a href="https://youtu.be/aV4cq7W9uY0">
       <img src="./cover-photo.png" alt="cover-photo"/>
    </a>
 </p>
 
-# Searching Github Repositories & Asking Questions
+<br>
 
 ## Overview
 This project allows you to search through Github repositories and ask questions about them. 
