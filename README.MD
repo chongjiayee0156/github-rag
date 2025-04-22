@@ -2,7 +2,7 @@
 
 <br>
 
-# Demo
+## Demo
 <p align="center">
    <a href="https://youtu.be/aV4cq7W9uY0">
       <img src="./cover-photo.png" alt="cover-photo"/>
