@@ -1,7 +1,7 @@
 
 <p align="center">
    <a href="https://youtu.be/aV4cq7W9uY0">
-      <img src="./" alt="cover-photo"/>
+      <img src="./cover-photo.png" alt="cover-photo"/>
    </a>
 </p>
 
