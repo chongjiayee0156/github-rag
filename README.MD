@@ -7,7 +7,7 @@
 This project allows you to search through Github repositories and ask questions about them. 
 Include any keywords or qualifiers you want to search for, and the app will return relevant results.
 
-# Setup Instructions
+## Setup Instructions
 1. Set up the backend:
    - Install dependencies: `pip install -r requirements.txt`
    - Copy `.env.example` to `.env` and fill in your credentials. (Github PAT, Google Cloud Vertex AI Project ID, etc.)
