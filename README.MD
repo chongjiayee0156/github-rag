@@ -1,5 +1,9 @@
-[watch demo](https://youtu.be/aV4cq7W9uY0)
 
+<p align="center">
+   <a href="https://youtu.be/aV4cq7W9uY0">
+      <img src="./" alt="cover-photo"/>
+   </a>
+</p>
 
 # Searching Github Repositories & Asking Questions
 
